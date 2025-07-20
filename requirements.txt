@@ -1,0 +1,25 @@
+# Core dependencies
+beautifulsoup4==4.13.4
+markitdown==0.1.2
+python-dotenv==1.1.1
+requests==2.32.4
+Pillow>=10.0.0
+
+# Optional dependencies for specific features
+# google-generativeai>=0.3.0  # For Gemini AI processing
+
+# Supporting libraries (auto-installed with core deps)
+certifi==2025.7.14
+charset-normalizer==3.4.2
+idna==3.10
+packaging==25.0
+soupsieve==2.7
+urllib3==2.5.0
+
+# Development dependencies (install with: pip install -e .[dev])
+# pytest>=7.0.0
+# pytest-cov>=4.0.0
+# black>=23.0.0
+# flake8>=6.0.0
+# mypy>=1.0.0
+# pre-commit>=3.0.0
