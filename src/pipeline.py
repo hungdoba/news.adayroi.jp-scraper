@@ -7,8 +7,7 @@ import json
 import shutil
 import codecs
 import datetime
-from pathlib import Path
-from typing import Optional, List
+from typing import Optional
 
 from markitdown import MarkItDown
 
@@ -45,6 +44,9 @@ class NewsPipeline:
         logger.info("Starting full news processing pipeline")
 
         try:
+            # Step 0: Clean data directories
+            self.step_0_clean()
+
             # Step 1: Scrape news feed
             news_feed = self.step_1_scrape_news_feed()
             if news_feed is None:
@@ -81,8 +83,11 @@ class NewsPipeline:
             # Step 8: Copy to Next.js
             self.step_8_copy_to_nextjs()
 
-            # Step 9: Deploy
-            self.step_9_deploy()
+            # Step 9: Cleanup Next.js
+            self.step_9_cleanup_nextjs()
+
+            # Step 10: Deploy
+            self.step_10_deploy()
 
             logger.info("Full pipeline completed successfully")
 
@@ -288,7 +293,13 @@ class NewsPipeline:
             nextjs_folder=self.config.nextjs_dir
         )
 
-    def step_9_deploy(self) -> None:
+    def step_9_cleanup_nextjs(self) -> None:
+        """Clean up old markdown files in Next.js project."""
+        logger.info("Step 10: Cleaning up Next.js")
+        cleanup_old_markdown_files(self.config.nextjs_dir)
+        logger.info("Next.js cleanup completed")
+
+    def step_10_deploy(self) -> None:
         """Deploy the Next.js application."""
         logger.info("Step 9: Starting deployment")
 
@@ -299,9 +310,3 @@ class NewsPipeline:
 
         git_push_next_app()
         logger.info("Deployment completed successfully")
-
-    def step_10_cleanup_nextjs(self) -> None:
-        """Clean up old markdown files in Next.js project."""
-        logger.info("Step 10: Cleaning up Next.js")
-        cleanup_old_markdown_files(self.config.nextjs_dir)
-        logger.info("Next.js cleanup completed")

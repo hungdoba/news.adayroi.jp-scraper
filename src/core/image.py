@@ -1,11 +1,12 @@
-import os
-import re
-import requests
-import hashlib
-
-from PIL import Image
-from pathlib import Path
 from urllib.parse import urlparse
+from pathlib import Path
+from PIL import Image
+import hashlib
+import requests
+import re
+import os
+import logging
+logger = logging.getLogger(__name__)
 
 
 def extract_thumbnail_from_yaml(content):
@@ -84,8 +85,8 @@ def download_and_replace_images(markdown_file_path, output_dir='data/6.images/im
     with open(new_file_path, 'w', encoding='utf-8') as file:
         file.write(content)
 
-    print(f"Updated markdown saved to {new_file_path}")
-    print(f"Downloaded {replacement_count} images")
+    logger.info(f"Updated markdown saved to {new_file_path}")
+    logger.info(f"Downloaded {replacement_count} images")
 
     return new_file_path
 
@@ -117,7 +118,7 @@ def _process_thumbnail(content, output_path, markdown_file_path):
             temp_filename.unlink()
 
         if webp_path:
-            print(
+            logger.info(
                 f"Downloaded and converted thumbnail to {thumbnail_filename}")
             return re.sub(
                 r'(thumbnail:\s*["\']).*?(["\'])',
@@ -125,10 +126,11 @@ def _process_thumbnail(content, output_path, markdown_file_path):
                 content
             )
     except (requests.RequestException, IOError) as e:
-        print(f"Error processing thumbnail: {e}")
+        logger.error(f"Error processing thumbnail: {e}")
 
     # If we reach here, something failed
-    print("Removing thumbnail URL from content due to download/conversion failure")
+    logger.warning(
+        "Removing thumbnail URL from content due to download/conversion failure")
     return re.sub(r'(thumbnail:\s*["\']).*?(["\'])', r'\1\2', content)
 
 
@@ -153,7 +155,7 @@ def _process_inline_images(content, output_path):
                 replacements[image_url] = str(local_path).replace(
                     'data\\6.images', '').replace('\\', '/')
         except Exception as e:
-            print(f"Error processing image {image_url}: {e}")
+            logger.error(f"Error processing image {image_url}: {e}")
             # Remove the image from content by replacing with empty string
             replacements[image_url] = ''
 
@@ -188,7 +190,7 @@ def _download_and_convert_image(image_url, output_path):
     safe_filename = re.sub(r'[<>:"/\\|?*]', '_', original_filename)
     local_path = output_path / safe_filename
 
-    print(f"Downloading image from {image_url}")
+    logger.info(f"Downloading image from {image_url}")
     response = requests.get(image_url, stream=True, timeout=10)
     response.raise_for_status()
 
@@ -202,7 +204,7 @@ def _download_and_convert_image(image_url, output_path):
     if not webp_path:
         raise ValueError(f"Failed to convert {local_path} to WebP")
 
-    print(f"Downloaded and converted image to {webp_path}")
+    logger.info(f"Downloaded and converted image to {webp_path}")
     return webp_path
 
 
@@ -232,7 +234,7 @@ def delete_remote_images(markdown_file_path, output_file_path=None):
     with open(output_file_path, 'w', encoding='utf-8') as file:
         file.write(content)
 
-    print(f"Removed {deleted_count} remote image references")
+    logger.info(f"Removed {deleted_count} remote image references")
 
     return output_file_path
 

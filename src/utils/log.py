@@ -1,6 +1,8 @@
 import os
 import json
 from datetime import datetime
+import logging
+logger = logging.getLogger(__name__)
 
 
 def log_id(log_file, log_id=None):
@@ -17,8 +19,11 @@ def get_all_ids(log_file):
     ids = []
     with open(log_file, 'r', encoding='utf-8') as f:
         for line in f:
-            entry = json.loads(line)
-            ids.append(entry['id'])
+            try:
+                entry = json.loads(line)
+                ids.append(entry['id'])
+            except json.JSONDecodeError:
+                continue
     return ids
 
 
@@ -28,4 +33,4 @@ if __name__ == "__main__":
     log_id(log_file, "test_id_2")
     log_id(log_file, "test_id_3")
     all_ids = get_all_ids(log_file)
-    print("All IDs:", all_ids)
+    logger.info(f"All IDs: {all_ids}")

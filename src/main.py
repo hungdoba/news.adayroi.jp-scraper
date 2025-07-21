@@ -4,12 +4,11 @@ Main entry point for the news scraper application.
 This module provides a CLI interface for running the news processing pipeline
 and individual pipeline steps.
 """
-import utils.file as file_utils
-from logging_config import get_logger
-from pipeline import NewsPipeline
-import argparse
 import sys
+import argparse
 from pathlib import Path
+from pipeline import NewsPipeline
+from logging_config import get_logger
 
 # Add src directory to path for imports
 sys.path.insert(0, str(Path(__file__).parent))
@@ -66,7 +65,10 @@ def run_specific_step(pipeline: NewsPipeline, step: str, input_file: str | None 
     logger.info(f"Running specific step: {step}")
 
     try:
-        if step == "scrape":
+        if step == "clean":
+            pipeline.step_0_clean()
+
+        elif step == "scrape":
             result = pipeline.step_1_scrape_news_feed()
             if result:
                 logger.info(f"Scraping completed. Output: {result}")
@@ -108,14 +110,11 @@ def run_specific_step(pipeline: NewsPipeline, step: str, input_file: str | None 
         elif step == "copy":
             pipeline.step_8_copy_to_nextjs()
 
-        elif step == "deploy":
-            pipeline.step_9_deploy()
-
-        elif step == "clean":
-            pipeline.step_0_clean()
-
         elif step == "cleanup":
-            pipeline.step_10_cleanup_nextjs()
+            pipeline.step_9_cleanup_nextjs()
+
+        elif step == "deploy":
+            pipeline.step_10_deploy()
 
         else:
             logger.error(f"Unknown step: {step}")

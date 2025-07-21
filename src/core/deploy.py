@@ -1,7 +1,9 @@
-import os
-import datetime
-import subprocess
 import glob
+import subprocess
+import datetime
+import os
+import logging
+logger = logging.getLogger(__name__)
 
 
 def build_next_app():
@@ -10,7 +12,7 @@ def build_next_app():
         if not nextjs_dir:
             # Fallback to default if environment variable not set
             nextjs_dir = "E:/Programming/Nextjs/news.adayroi.jp"
-            print(
+            logger.info(
                 f"NEXTJS_DIR environment variable not set, using default: {nextjs_dir}")
 
         if not os.path.exists(nextjs_dir):
@@ -23,7 +25,7 @@ def build_next_app():
         _run_command_and_stream_output(command, args, nextjs_dir)
         return True
     except Exception as e:
-        print(f"Error building Next.js app: {e}")
+        logger.error(f"Error building Next.js app: {e}")
         return False
 
 
@@ -32,7 +34,7 @@ def git_push_next_app():
     if not nextjs_dir:
         # Fallback to default if environment variable not set
         nextjs_dir = "E:/Programming/Nextjs/news.adayroi.jp"
-        print(
+        logger.info(
             f"NEXTJS_DIR environment variable not set, using default: {nextjs_dir}")
 
     if not os.path.exists(nextjs_dir):
@@ -63,10 +65,10 @@ def _cleanup_problematic_files(nextjs_dir):
             if len(full_path) > max_path_length or len(file) > 200:
                 try:
                     os.remove(full_path)
-                    print(
+                    logger.info(
                         f"Removed file with problematic name: {file[:50]}...")
                 except OSError as e:
-                    print(
+                    logger.error(
                         f"Could not remove problematic file {file[:50]}...: {e}")
 
 
@@ -81,8 +83,9 @@ def _run_command_and_stream_output(command, args, cwd):
         encoding="utf-8"  # <-- Add this line
     )
 
-    for line in process.stdout:
-        print(line, end='')
+    if process.stdout:
+        for line in process.stdout:
+            logger.info(line.rstrip())
 
     process.wait()
     if process.returncode != 0:

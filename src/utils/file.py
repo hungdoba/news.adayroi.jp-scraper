@@ -1,13 +1,14 @@
-import datetime
-import re
-import os
-import json
-import codecs
-import random
-import shutil
-import string
-
 from core.image import extract_image_urls
+import string
+import shutil
+import random
+import codecs
+import json
+import os
+import re
+import datetime
+import logging
+logger = logging.getLogger(__name__)
 
 
 def sanitize_yaml_value(value):
@@ -45,7 +46,7 @@ def merge_html_file(html_files, output_folder, title_content):
     merged_content = []
     for html_file in html_files:
         if not os.path.exists(html_file):
-            print(f"Warning: File {html_file} not found, skipping...")
+            logger.warning(f"File {html_file} not found, skipping...")
             continue
 
         with codecs.open(html_file, 'r', encoding='utf-8') as f:
@@ -131,7 +132,7 @@ def copy_to_nextjs(input_folder: str, nextjs_folder: str):
             target_path = os.path.join(nextjs_markdown_folder, rel_path)
 
             # Copy markdown file
-            print(f">> Copying {markdown_file_path} to {target_path}")
+            logger.info(f"Copying {markdown_file_path} to {target_path}")
             shutil.copy2(markdown_file_path, target_path)
 
             # Copy thumbnail
@@ -146,13 +147,13 @@ def copy_to_nextjs(input_folder: str, nextjs_folder: str):
             if os.path.exists(thumbnail_file_path):
                 shutil.copy2(thumbnail_file_path, target_thumbnail_path)
             else:
-                print(f">> Thumbnail not found: {thumbnail_file_path}")
+                logger.warning(f"Thumbnail not found: {thumbnail_file_path}")
 
             # Copy images referenced in markdown
             copy_markdown_images(markdown_file_path, root,
                                  input_folder, nextjs_images_folder, rel_path)
 
-    print(
+    logger.info(
         f"Copy complete: {copied_files} of {total_files} files copied to {nextjs_folder}")
 
 
@@ -180,14 +181,14 @@ def copy_markdown_images(markdown_path, root, input_folder, nextjs_images_folder
             shutil.copy2(alt_image_path, target_image_path)
             continue
 
-        print(f">> Image not found: {image}")
-        print(f"   Tried: {image_path}")
-        print(f"   Also tried: {alt_image_path}")
+        logger.warning(f"Image not found: {image}")
+        logger.info(f"   Tried: {image_path}")
+        logger.info(f"   Also tried: {alt_image_path}")
 
 
 def delete_nextjs_markdown_file(nextjs_folder: str, markdown_filename: str):
-    print(
-        f">> Deleting markdown file: {markdown_filename} from {nextjs_folder}")
+    logger.info(
+        f"Deleting markdown file: {markdown_filename} from {nextjs_folder}")
 
     content_folder = os.path.join(nextjs_folder, 'content')
     images_folder = os.path.join(nextjs_folder, 'public')
@@ -212,9 +213,9 @@ def delete_nextjs_markdown_file(nextjs_folder: str, markdown_filename: str):
 
         if os.path.exists(thumbnail_path):
             os.remove(thumbnail_path)
-            print(f">> Deleted thumbnail: {thumbnail_path}")
+            logger.info(f"Deleted thumbnail: {thumbnail_path}")
         else:
-            print(f">> Thumbnail not found: {thumbnail_path}")
+            logger.warning(f"Thumbnail not found: {thumbnail_path}")
             # raise FileNotFoundError(
             #     f"Thumbnail not found for {thumbnail_path}")
 
@@ -227,19 +228,19 @@ def delete_nextjs_markdown_file(nextjs_folder: str, markdown_filename: str):
 
             if os.path.exists(image_path):
                 os.remove(image_path)
-                print(f">> Deleted image: {image_path}")
+                logger.info(f"Deleted image: {image_path}")
                 continue
             else:
                 raise FileNotFoundError(
                     f"Image not found in markdown directory: {image_path} | {images_folder}")
 
         os.remove(markdown_path)
-        print(f">> Deleted markdown: {markdown_path}")
+        logger.info(f"Deleted markdown: {markdown_path}")
 
         return True
 
     except Exception as e:
-        print(f">> Error deleting {markdown_filename}: {e}")
+        logger.error(f"Error deleting {markdown_filename}: {e}")
         return False
 
 
