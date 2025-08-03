@@ -207,7 +207,7 @@ def delete_nextjs_markdown_file(nextjs_folder: str, markdown_filename: str):
         thumbnail_path = os.path.join(
             images_folder,
             'images',
-            'thubnails',
+            'thumbnails',
             markdown_filename.replace('.md', '.webp')
         )
 
