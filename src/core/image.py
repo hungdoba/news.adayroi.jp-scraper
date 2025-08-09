@@ -155,9 +155,10 @@ def _process_inline_images(content, output_path):
                 replacements[image_url] = str(local_path).replace(
                     'data\\6.images', '').replace('\\', '/')
         except Exception as e:
-            logger.error(f"Error processing image {image_url}: {e}")
-            # Remove the image from content by replacing with empty string
-            replacements[image_url] = ''
+            # Remove the image from content completely
+            replacements[image_url] = None
+            print(f"Error downloading image {image_url}: {e}")
+            print("Removing image reference from content")
 
     # Replace all URLs with local paths
     result = content
