@@ -156,7 +156,7 @@ def _process_inline_images(content, output_path):
                     'data\\6.images', '').replace('\\', '/')
         except Exception as e:
             # Remove the image from content completely
-            replacements[image_url] = None
+            replacements[image_url] = ""
             print(f"Error downloading image {image_url}: {e}")
             print("Removing image reference from content")
 
