@@ -15,6 +15,7 @@ idna==3.10
 packaging==25.0
 soupsieve==2.7
 urllib3==2.5.0
+google-genai==1.31.0
 
 # Development dependencies (install with: pip install -e .[dev])
 # pytest>=7.0.0
