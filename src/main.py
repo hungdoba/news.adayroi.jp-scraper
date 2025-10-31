@@ -19,10 +19,11 @@ def create_argument_parser() -> argparse.ArgumentParser:
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  python main.py                    # Run full pipeline
-  python main.py --step scrape      # Run only scraping step
-  python main.py --step clean       # Clean data directories
-  python main.py --step cleanup     # Cleanup Next.js files
+  python main.py                         # Run full pipeline
+  python main.py --skip-obsidian         # Run pipeline without opening Obsidian
+  python main.py --step scrape           # Run only scraping step
+  python main.py --step clean            # Clean data directories
+  python main.py --step cleanup          # Cleanup Next.js files
         """
     )
 
@@ -50,6 +51,12 @@ Examples:
         choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"],
         default="INFO",
         help="Set the logging level"
+    )
+
+    parser.add_argument(
+        "--skip-obsidian",
+        action="store_true",
+        help="Skip opening Obsidian during the pipeline (useful for automated runs)"
     )
 
     return parser
@@ -133,6 +140,10 @@ def main() -> None:
     try:
         # Initialize pipeline
         pipeline = NewsPipeline()
+
+        # Set skip_obsidian flag if provided
+        if hasattr(args, 'skip_obsidian'):
+            pipeline.skip_obsidian = args.skip_obsidian
 
         if args.step:
             # Run specific step

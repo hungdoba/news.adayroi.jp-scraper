@@ -37,6 +37,7 @@ class NewsPipeline:
         """Initialize the pipeline with configuration."""
         config.validate()
         self.config = config
+        self.skip_obsidian = False  # Flag to skip Obsidian step
         logger.info("News pipeline initialized")
 
     def run_full_pipeline(self) -> None:
@@ -77,8 +78,12 @@ class NewsPipeline:
             # Step 6: Download images
             self.step_6_download_images(self.config.dir_step_5)
 
-            # Step 7: Open Obsidian (optional)
-            self.step_7_open_obsidian()
+            # Step 7: Open Obsidian (optional - skip if flag is set)
+            if not self.skip_obsidian:
+                self.step_7_open_obsidian()
+            else:
+                logger.info(
+                    "Step 7: Skipping Obsidian (--skip-obsidian flag set)")
 
             # Step 8: Copy to Next.js
             self.step_8_copy_to_nextjs()

@@ -96,6 +96,14 @@ Key environment variables in `.env`:
 python run.py
 ```
 
+### Run Pipeline Without Obsidian
+
+If you want to run the full pipeline but skip opening Obsidian (useful for automated runs):
+
+```bash
+python run.py --skip-obsidian
+```
+
 ### Run Individual Steps
 
 ```bash
