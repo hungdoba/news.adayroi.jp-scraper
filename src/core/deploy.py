@@ -3,21 +3,33 @@ import subprocess
 import datetime
 import os
 import logging
+from exceptions import ConfigurationError
+
 logger = logging.getLogger(__name__)
 
 
 def build_next_app():
+    """
+    Build the Next.js application.
+
+    Returns:
+        bool: True if build succeeded, False otherwise
+
+    Raises:
+        ConfigurationError: If NEXTJS_DIR is not configured
+    """
     try:
         nextjs_dir = os.environ.get('NEXTJS_DIR')
         if not nextjs_dir:
-            # Fallback to default if environment variable not set
-            nextjs_dir = "E:/Programming/Nextjs/news.adayroi.jp"
-            logger.info(
-                f"NEXTJS_DIR environment variable not set, using default: {nextjs_dir}")
+            raise ConfigurationError(
+                "NEXTJS_DIR environment variable is not set. "
+                "Please configure it in your .env file."
+            )
 
         if not os.path.exists(nextjs_dir):
             raise FileNotFoundError(
-                f"NextJS directory does not exist: {nextjs_dir}")
+                f"NextJS directory does not exist: {nextjs_dir}"
+            )
 
         command = r"C:\Program Files\nodejs\npm.cmd"
         args = ["run", "build"]
@@ -30,12 +42,18 @@ def build_next_app():
 
 
 def git_push_next_app():
+    """
+    Commit and push changes to the Next.js repository.
+
+    Raises:
+        ConfigurationError: If NEXTJS_DIR is not configured
+    """
     nextjs_dir = os.environ.get('NEXTJS_DIR')
     if not nextjs_dir:
-        # Fallback to default if environment variable not set
-        nextjs_dir = "E:/Programming/Nextjs/news.adayroi.jp"
-        logger.info(
-            f"NEXTJS_DIR environment variable not set, using default: {nextjs_dir}")
+        raise ConfigurationError(
+            "NEXTJS_DIR environment variable is not set. "
+            "Please configure it in your .env file."
+        )
 
     if not os.path.exists(nextjs_dir):
         raise FileNotFoundError(

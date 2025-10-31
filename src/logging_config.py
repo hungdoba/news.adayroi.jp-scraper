@@ -31,7 +31,7 @@ def setup_logging(
 
     # Get root logger
     logger = logging.getLogger("news_scraper")
-    logger.setLevel(logging.INFO)
+    logger.setLevel(getattr(logging, level.upper()))
 
     # Clear existing handlers
     logger.handlers.clear()
