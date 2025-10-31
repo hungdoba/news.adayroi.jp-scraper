@@ -6,13 +6,8 @@ and individual pipeline steps.
 """
 import sys
 import argparse
-from pathlib import Path
 from pipeline import NewsPipeline
 from logging_config import get_logger
-
-# Add src directory to path for imports
-sys.path.insert(0, str(Path(__file__).parent))
-
 
 logger = get_logger(__name__)
 

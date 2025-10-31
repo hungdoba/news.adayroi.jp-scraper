@@ -15,8 +15,13 @@ A Python-based news scraping and processing pipeline that fetches articles from 
 
 ```
 news.adayroi.jp-scraper/
+├── run.py                      # Main launcher script (run this!)
 ├── src/
-│   ├── main.py                 # Main pipeline orchestrator
+│   ├── main.py                 # Main application logic
+│   ├── pipeline.py             # Pipeline orchestrator
+│   ├── config.py               # Configuration management
+│   ├── logging_config.py       # Logging setup
+│   ├── exceptions.py           # Custom exceptions
 │   ├── core/                   # Core business logic
 │   │   ├── scraper.py         # Web scraping functionality
 │   │   ├── gemini.py          # AI processing (grouping, translation)
@@ -36,10 +41,13 @@ news.adayroi.jp-scraper/
 │   ├── 4.markdown/            # Converted markdown
 │   ├── 5.translated/          # Translated content
 │   └── 6.images/              # Downloaded images
-├── .env                        # Environment variables
+├── logs/                       # Application logs
+├── .env                        # Environment variables (create from .env.example)
+├── .env.example                # Environment variables template
 ├── .gitignore                 # Git ignore rules
 ├── requirements.txt           # Python dependencies
-└── processed_ids.txt          # Processed article IDs log
+├── processed_ids.txt          # Processed article IDs log
+└── README.md                  # This file
 ```
 
 ## Installation
@@ -85,20 +93,32 @@ Key environment variables in `.env`:
 ### Run Complete Pipeline
 
 ```bash
-python src/main.py
+python run.py
 ```
 
 ### Run Individual Steps
 
 ```bash
 # Run specific pipeline steps
-python src/main.py --step scrape      # Scrape news feed
-python src/main.py --step group       # Group articles with AI
-python src/main.py --step merge       # Merge related articles
-python src/main.py --step convert     # Convert to Markdown
-python src/main.py --step translate   # Translate content
-python src/main.py --step images      # Download images
-python src/main.py --step clean       # Clean data directories
+python run.py --step scrape      # Scrape news feed
+python run.py --step group       # Group articles with AI
+python run.py --step merge       # Merge related articles
+python run.py --step convert     # Convert to Markdown
+python run.py --step translate   # Translate content
+python run.py --step images      # Download images
+python run.py --step clean       # Clean data directories
+```
+
+### View Help
+
+```bash
+python run.py --help
+```
+
+### Set Log Level
+
+```bash
+python run.py --log-level DEBUG
 ```
 
 ## Pipeline Steps
