@@ -19,8 +19,8 @@ def create_argument_parser() -> argparse.ArgumentParser:
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  python main.py                         # Run full pipeline
-  python main.py --skip-obsidian         # Run pipeline without opening Obsidian
+  python main.py                         # Run full pipeline (skips Obsidian by default)
+  python main.py --use-obsidian          # Run pipeline and open Obsidian
   python main.py --step scrape           # Run only scraping step
   python main.py --step clean            # Clean data directories
   python main.py --step cleanup          # Cleanup Next.js files
@@ -56,7 +56,15 @@ Examples:
     parser.add_argument(
         "--skip-obsidian",
         action="store_true",
-        help="Skip opening Obsidian during the pipeline (useful for automated runs)"
+        default=True,  # Default to True - skip Obsidian by default
+        help="Skip opening Obsidian during the pipeline (default behavior)"
+    )
+
+    parser.add_argument(
+        "--use-obsidian",
+        action="store_false",
+        dest="skip_obsidian",
+        help="Open Obsidian during the pipeline (overrides default)"
     )
 
     return parser
