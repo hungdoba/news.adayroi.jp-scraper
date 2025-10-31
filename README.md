@@ -90,19 +90,15 @@ python src/main.py
 
 ### Run Individual Steps
 
-```python
-from src.main import *
-
-# Step 1: Scrape news feed
-news_feed = step_1_scrape_news_feed()
-
-# Step 2: Group articles with AI
-group_articles = step_2_group_articles(news_feed)
-
-# Step 3: Merge related articles
-step_3_merge_articles(group_articles, DIR_STEP_3)
-
-# Continue with other steps...
+```bash
+# Run specific pipeline steps
+python src/main.py --step scrape      # Scrape news feed
+python src/main.py --step group       # Group articles with AI
+python src/main.py --step merge       # Merge related articles
+python src/main.py --step convert     # Convert to Markdown
+python src/main.py --step translate   # Translate content
+python src/main.py --step images      # Download images
+python src/main.py --step clean       # Clean data directories
 ```
 
 ## Pipeline Steps
@@ -123,19 +119,12 @@ step_3_merge_articles(group_articles, DIR_STEP_3)
 - `markitdown`: HTML to Markdown conversion
 - `requests`: HTTP requests
 - `python-dotenv`: Environment variable management
-- Google Gemini API for AI processing
-
-## Contributing
-
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Add tests for new functionality
-5. Submit a pull request
+- `google-genai`: Google Gemini API for AI processing
+- `Pillow`: Image processing
 
 ## License
 
-[Add your license information here]
+MIT License
 
 ## Support
 
