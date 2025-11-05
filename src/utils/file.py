@@ -35,6 +35,60 @@ def sanitize_yaml_value(value):
     return sanitized
 
 
+def sanitize_slug(slug):
+    """
+    Sanitize slug to ensure it's URL-safe (ASCII only, no special characters).
+
+    Args:
+        slug: The slug string to sanitize
+
+    Returns:
+        Sanitized slug with only lowercase ASCII letters, numbers, and hyphens
+    """
+    if not isinstance(slug, str):
+        return slug
+
+    # Convert to lowercase
+    sanitized = slug.lower()
+
+    # Replace Vietnamese characters with ASCII equivalents
+    vietnamese_map = {
+        'à': 'a', 'á': 'a', 'ả': 'a', 'ã': 'a', 'ạ': 'a',
+        'ă': 'a', 'ằ': 'a', 'ắ': 'a', 'ẳ': 'a', 'ẵ': 'a', 'ặ': 'a',
+        'â': 'a', 'ầ': 'a', 'ấ': 'a', 'ẩ': 'a', 'ẫ': 'a', 'ậ': 'a',
+        'è': 'e', 'é': 'e', 'ẻ': 'e', 'ẽ': 'e', 'ẹ': 'e',
+        'ê': 'e', 'ề': 'e', 'ế': 'e', 'ể': 'e', 'ễ': 'e', 'ệ': 'e',
+        'ì': 'i', 'í': 'i', 'ỉ': 'i', 'ĩ': 'i', 'ị': 'i',
+        'ò': 'o', 'ó': 'o', 'ỏ': 'o', 'õ': 'o', 'ọ': 'o',
+        'ô': 'o', 'ồ': 'o', 'ố': 'o', 'ổ': 'o', 'ỗ': 'o', 'ộ': 'o',
+        'ơ': 'o', 'ờ': 'o', 'ớ': 'o', 'ở': 'o', 'ỡ': 'o', 'ợ': 'o',
+        'ù': 'u', 'ú': 'u', 'ủ': 'u', 'ũ': 'u', 'ụ': 'u',
+        'ư': 'u', 'ừ': 'u', 'ứ': 'u', 'ử': 'u', 'ữ': 'u', 'ự': 'u',
+        'ỳ': 'y', 'ý': 'y', 'ỷ': 'y', 'ỹ': 'y', 'ỵ': 'y',
+        'đ': 'd',
+    }
+
+    for viet_char, ascii_char in vietnamese_map.items():
+        sanitized = sanitized.replace(viet_char, ascii_char)
+
+    # Remove any non-ASCII, non-alphanumeric characters except hyphens
+    sanitized = re.sub(r'[^a-z0-9-]', '-', sanitized)
+
+    # Replace multiple consecutive hyphens with a single hyphen
+    sanitized = re.sub(r'-+', '-', sanitized)
+
+    # Remove leading/trailing hyphens
+    sanitized = sanitized.strip('-')
+
+    # Limit length to 100 characters
+    if len(sanitized) > 100:
+        sanitized = sanitized[:100].rstrip('-')
+
+    logger.debug(f"Sanitized slug: '{slug}' → '{sanitized}'")
+
+    return sanitized
+
+
 def merge_html_file(html_files, output_folder, title_content):
     if not os.path.exists(output_folder):
         os.makedirs(output_folder)
@@ -246,11 +300,12 @@ def delete_nextjs_markdown_file(nextjs_folder: str, markdown_filename: str):
 
 def cleanup_old_markdown_files(project_folder: str):
     """
-    Remove markdown files older than one month and their associated images.
+    Remove markdown files older than one month and files with non-ASCII characters in filenames.
     """
     content_folder = os.path.join(project_folder, 'content')
-
     cutoff_date = datetime.datetime.now() - datetime.timedelta(days=30)
+
+    files_to_delete = []
 
     for root, _, files in os.walk(content_folder):
         for file in files:
@@ -258,28 +313,54 @@ def cleanup_old_markdown_files(project_folder: str):
                 continue
 
             markdown_path = os.path.join(root, file)
+            should_delete = False
+            reason = None
 
-            # Read the markdown file to check created_at
-            with open(markdown_path, 'r', encoding='utf-8') as f:
-                content = f.read()
+            # Check 1: Files with non-ASCII characters in filename (problematic for URLs)
+            if not file.replace('.md', '').encode('ascii', 'ignore').decode('ascii') == file.replace('.md', ''):
+                should_delete = True
+                reason = "non-ASCII characters in filename"
+                logger.warning(f"Found file with non-ASCII characters: {file}")
 
-            # Extract created_at from frontmatter
-            frontmatter_match = re.search(
-                r'---\s*(.*?)\s*---', content, re.DOTALL)
-            if not frontmatter_match:
-                continue
+            # Check 2: Files older than one month
+            if not should_delete:
+                try:
+                    # Read the markdown file to check created_at
+                    with open(markdown_path, 'r', encoding='utf-8') as f:
+                        content = f.read()
 
-            frontmatter = frontmatter_match.group(1)
-            date_match = re.search(
-                r'created_at\s*:\s*["\']?(\d{4}-\d{2}-\d{2})', frontmatter)
+                    # Extract created_at from frontmatter
+                    frontmatter_match = re.search(
+                        r'---\s*(.*?)\s*---', content, re.DOTALL)
+                    if frontmatter_match:
+                        frontmatter = frontmatter_match.group(1)
+                        date_match = re.search(
+                            r'created_at\s*:\s*["\']?(\d{4}-\d{2}-\d{2})', frontmatter)
 
-            if not date_match:
-                continue
+                        if date_match:
+                            created_date = datetime.datetime.strptime(
+                                date_match.group(1), '%Y-%m-%d')
 
-            created_date = datetime.datetime.strptime(
-                date_match.group(1), '%Y-%m-%d')
+                            # Check if file is older than one month
+                            if created_date < cutoff_date:
+                                should_delete = True
+                                reason = f"older than 30 days (created: {created_date.strftime('%Y-%m-%d')})"
+                except Exception as e:
+                    logger.error(f"Error checking file {file}: {e}")
+                    continue
 
-            # Check if file is older than one month
-            if created_date < cutoff_date:
-                delete_nextjs_markdown_file(
-                    project_folder, file)
+            if should_delete:
+                files_to_delete.append((file, reason))
+
+    # Delete identified files
+    deleted_count = 0
+    for file, reason in files_to_delete:
+        try:
+            logger.info(f"Deleting {file} - Reason: {reason}")
+            delete_nextjs_markdown_file(project_folder, file)
+            deleted_count += 1
+        except Exception as e:
+            logger.error(f"Failed to delete {file}: {e}")
+
+    logger.info(
+        f"Cleanup completed: {deleted_count} files deleted, {len(files_to_delete) - deleted_count} failures")

@@ -91,20 +91,42 @@ def _cleanup_problematic_files(nextjs_dir):
 
 
 def _run_command_and_stream_output(command, args, cwd):
+    """Run a command and stream its output to the logger."""
     process = subprocess.Popen(
         [command] + args,
         cwd=cwd,
         stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT,
+        stderr=subprocess.PIPE,  # Capture stderr separately
         text=True,
         bufsize=1,
-        encoding="utf-8"  # <-- Add this line
+        encoding="utf-8"
     )
+
+    # Capture both stdout and stderr
+    stdout_lines = []
+    stderr_lines = []
 
     if process.stdout:
         for line in process.stdout:
-            logger.info(line.rstrip())
+            line = line.rstrip()
+            stdout_lines.append(line)
+            logger.info(line)
+
+    if process.stderr:
+        for line in process.stderr:
+            line = line.rstrip()
+            stderr_lines.append(line)
+            logger.error(line)
 
     process.wait()
+
     if process.returncode != 0:
-        raise subprocess.CalledProcessError(process.returncode, command)
+        error_msg = f"Command failed with exit code {process.returncode}"
+        if stderr_lines:
+            error_msg += f"\nStderr output:\n" + \
+                "\n".join(stderr_lines[-10:])  # Last 10 lines
+        if stdout_lines:
+            error_msg += f"\nStdout output:\n" + \
+                "\n".join(stdout_lines[-10:])  # Last 10 lines
+        raise subprocess.CalledProcessError(
+            process.returncode, command, output=error_msg)

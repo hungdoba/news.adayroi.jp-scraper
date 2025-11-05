@@ -2,7 +2,7 @@
 AI processing module using Google Gemini API.
 This module handles article grouping and translation using Gemini AI.
 """
-from utils.file import sanitize_yaml_value
+from utils.file import sanitize_yaml_value, sanitize_slug
 import logging
 import os
 import json
@@ -236,6 +236,9 @@ def translate_article(file_path):
     Returns:
         Dictionary with translated content or error message
     """
+    filename = os.path.basename(file_path)
+    logger.info(f"Processing translation for: {filename}")
+
     with open(file_path, 'r', encoding='utf-8') as file:
         markdown_content = file.read()
         lines = markdown_content.splitlines()
@@ -243,54 +246,119 @@ def translate_article(file_path):
         if lines and lines[0].startswith("![]("):
             thumbnail = lines[0]
             lines.pop(0)
+            logger.debug(f"Extracted thumbnail from {filename}")
         markdown_content = "\n".join(lines)
+
+    content_length = len(markdown_content)
+    logger.debug(f"Content length: {content_length} characters")
 
     prompt = PROMPT_TRANSLATE_ARTICLES + markdown_content
     max_retries = 3
     retry_delay = 5
     response = None
 
+    logger.info(f"Sending translation request to Gemini API for {filename}")
     for attempt in range(max_retries):
         try:
             response = client.models.generate_content(
                 model=GEMINI_MODEL,
                 contents=[prompt],
             )
+            logger.info(f"✓ Received response from Gemini API for {filename}")
             break
         except Exception as e:
             if attempt < max_retries - 1:
                 logger.error(
-                    f"Error generating content (attempt {attempt+1}/{max_retries}): {e}")
+                    f"✗ Error generating content (attempt {attempt+1}/{max_retries}) for {filename}: {e}")
                 logger.info(f"Retrying in {retry_delay} seconds...")
                 time.sleep(retry_delay)
                 retry_delay *= 2
             else:
-                logger.error(f"Failed after {max_retries} attempts: {e}")
+                logger.error(
+                    f"✗ Failed after {max_retries} attempts for {filename}: {e}")
                 return {"error": str(e)}
 
     if not response or not hasattr(response, "text") or not response.text:
-        logger.error("No response from API")
+        logger.error(f"✗ No response from API for {filename}")
         return {"error": "No response from API"}
-    response_text = response.text.strip()
 
-    if "```json" in response_text and "```" in response_text.split("```json", 1)[1]:
-        json_str = response_text.split("```json", 1)[
-            1].split("```", 1)[0].strip()
-    elif "```" in response_text and "```" in response_text.split("```", 1)[1]:
-        json_str = response_text.split("```", 1)[1].split("```", 1)[0].strip()
-    else:
+    response_text = response.text.strip()
+    response_length = len(response_text)
+    logger.debug(f"Response length: {response_length} characters")
+
+    # Extract JSON from code blocks (handle both ```json and ``` markers)
+    json_str = response_text
+    try:
+        # Try to extract from ```json code block first
+        if "```json" in response_text:
+            logger.debug(f"Extracting JSON from ```json code block")
+            parts = response_text.split("```json", 1)
+            if len(parts) > 1 and "```" in parts[1]:
+                json_str = parts[1].split("```", 1)[0].strip()
+                logger.debug(
+                    f"Successfully extracted JSON content ({len(json_str)} chars)")
+        # Try generic ``` code block
+        elif "```" in response_text:
+            logger.debug(f"Extracting JSON from generic ``` code block")
+            parts = response_text.split("```", 1)
+            if len(parts) > 1 and "```" in parts[1]:
+                json_str = parts[1].split("```", 1)[0].strip()
+                logger.debug(
+                    f"Successfully extracted JSON content ({len(json_str)} chars)")
+        else:
+            logger.debug(f"No code blocks found, using raw response")
+    except (IndexError, AttributeError) as e:
+        logger.warning(
+            f"Could not extract JSON from code blocks for {filename}: {e}, using raw response")
         json_str = response_text
 
     try:
+        logger.debug(f"Parsing JSON for {filename}")
         result = json.loads(json_str)
+        logger.info(f"✓ Successfully parsed translation result for {filename}")
+
         if thumbnail:
             thumbnail = thumbnail.replace("![](", "").replace(")", "")
             result["thumbnail"] = thumbnail
+            logger.debug(f"Added thumbnail to result")
+
+        # Log field presence
+        logger.debug(f"Translation contains: title={bool(result.get('title'))}, "
+                     f"slug={bool(result.get('slug'))}, "
+                     f"description={bool(result.get('description'))}, "
+                     f"content={bool(result.get('content'))}")
+
         return result
-    except json.JSONDecodeError:
-        logger.error("Failed to parse translation result")
-        logger.error(f"Raw response: {response.text}")
-        return response.text
+    except json.JSONDecodeError as e:
+        logger.error(f"✗ Failed to parse translation result for {filename}")
+        logger.error(f"JSON parse error: {e}")
+        logger.error(f"Error at position: line {e.lineno}, column {e.colno}")
+
+        # Try to fix common JSON issues and retry parsing
+        try:
+            logger.info(f"Attempting to fix JSON formatting issues...")
+            # Fix common escape sequence issues
+            fixed_json = json_str.replace(
+                '\\escape', '\\\\escape')  # Fix invalid escape
+            fixed_json = fixed_json.replace(
+                '\\"', '"')  # Fix excessive escaping
+
+            # Try parsing the fixed version
+            result = json.loads(fixed_json)
+            logger.info(f"✓ Successfully parsed after fixing JSON formatting")
+
+            if thumbnail:
+                thumbnail = thumbnail.replace("![](", "").replace(")", "")
+                result["thumbnail"] = thumbnail
+
+            return result
+        except json.JSONDecodeError as e2:
+            logger.error(f"✗ Failed to parse even after attempting fixes")
+            logger.error(
+                f"First 500 chars of problematic JSON: {json_str[:500]}")
+            logger.error(
+                f"Last 500 chars of problematic JSON: {json_str[-500:]}")
+            return {"error": f"JSON parse error: {e}", "raw_response": response.text}
 
 
 def translate_article_list(input_folder, output_folder="data/5.translated"):
@@ -303,38 +371,74 @@ def translate_article_list(input_folder, output_folder="data/5.translated"):
     """
     os.makedirs(output_folder, exist_ok=True)
 
-    for filename in os.listdir(input_folder):
-        if filename.endswith('.md'):
-            file_path = os.path.join(input_folder, filename)
-            translated_content = translate_article(file_path)
+    # Count total files to process
+    markdown_files = [f for f in os.listdir(input_folder) if f.endswith('.md')]
+    total_files = len(markdown_files)
+    logger.info(f"Found {total_files} markdown files to translate")
 
-            if isinstance(translated_content, dict):
-                pass
-            elif isinstance(translated_content, str):
-                try:
-                    translated_content = json.loads(translated_content)
-                except json.JSONDecodeError:
-                    logger.error(
-                        f"Failed to parse translation result for {filename}")
-                    continue
+    processed_count = 0
+    success_count = 0
+    error_count = 0
 
-            title = sanitize_yaml_value(translated_content.get('title', ''))
-            slug = translated_content.get('slug', '')
-            thumbnail = translated_content.get('thumbnail', '')
-            description = sanitize_yaml_value(
-                translated_content.get('description', ''))
-            use = translated_content.get('use', False)
-            content = translated_content.get('content', '')
+    for index, filename in enumerate(markdown_files, 1):
+        logger.info(f"{'='*60}")
+        logger.info(f"[{index}/{total_files}] Translating: {filename}")
+        logger.info(f"{'='*60}")
 
-            if not title or not slug or not description or not content:
+        file_path = os.path.join(input_folder, filename)
+        translated_content = translate_article(file_path)
+
+        # Handle error responses
+        if isinstance(translated_content, dict) and "error" in translated_content:
+            logger.error(
+                f"✗ Translation failed for {filename}: {translated_content.get('error')}")
+            error_count += 1
+            continue
+
+        # Convert string response to dict if needed
+        if isinstance(translated_content, str):
+            try:
+                translated_content = json.loads(translated_content)
+            except json.JSONDecodeError as e:
                 logger.error(
-                    f"Missing required fields in translation for {filename}")
+                    f"✗ Failed to parse translation result for {filename}: {e}")
+                error_count += 1
                 continue
 
-            output_file_path = os.path.join(output_folder, f"{slug}.md")
-            created_at = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        # Validate required fields
+        if not isinstance(translated_content, dict):
+            logger.error(
+                f"✗ Invalid translation format for {filename}: expected dict, got {type(translated_content)}")
+            error_count += 1
+            continue
 
-            yaml_header = f"""---
+        title = sanitize_yaml_value(translated_content.get('title', ''))
+        slug = sanitize_slug(translated_content.get('slug', ''))
+        thumbnail = translated_content.get('thumbnail', '')
+        description = sanitize_yaml_value(
+            translated_content.get('description', ''))
+        use = translated_content.get('use', False)
+        content = translated_content.get('content', '')
+
+        if not title or not slug or not description or not content:
+            missing_fields = []
+            if not title:
+                missing_fields.append('title')
+            if not slug:
+                missing_fields.append('slug')
+            if not description:
+                missing_fields.append('description')
+            if not content:
+                missing_fields.append('content')
+            logger.error(
+                f"✗ Missing required fields in translation for {filename}: {', '.join(missing_fields)}")
+            error_count += 1
+            continue
+
+        output_file_path = os.path.join(output_folder, f"{slug}.md")
+        created_at = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+        yaml_header = f"""---
 title: "{title}"
 slug: "{slug}"
 thumbnail: "{thumbnail}"
@@ -345,11 +449,25 @@ created_at: "{created_at}"
 
 """
 
-            with open(output_file_path, 'w', encoding='utf-8') as output_file:
-                output_file.write(yaml_header + content)
+        logger.info(f"Writing translated content to: {slug}.md")
+        with open(output_file_path, 'w', encoding='utf-8') as output_file:
+            output_file.write(yaml_header + content)
 
-            logger.info(f"Translated {filename} to {output_file_path}")
-            time.sleep(4)
+        processed_count += 1
+        success_count += 1
+        logger.info(f"✓ Successfully translated {filename} → {slug}.md")
+        logger.info(
+            f"Progress: {success_count} success, {error_count} errors, {total_files - index} remaining")
+
+        logger.info(f"Waiting 4 seconds before next translation...")
+        time.sleep(4)
+
+    logger.info(f"{'='*60}")
+    logger.info(f"Translation completed!")
+    logger.info(f"Total files: {total_files}")
+    logger.info(f"Successfully translated: {success_count}")
+    logger.info(f"Failed: {error_count}")
+    logger.info(f"{'='*60}")
 
 
 def _fallback_group_articles(file_path: str) -> Optional[str]:
