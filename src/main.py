@@ -15,7 +15,7 @@ logger = get_logger(__name__)
 def create_argument_parser() -> argparse.ArgumentParser:
     """Create and configure the argument parser."""
     parser = argparse.ArgumentParser(
-        description="News Scraper for Adayroi.jp",
+        description="News Scraper for hungba.net",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:

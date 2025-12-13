@@ -1,4 +1,4 @@
-# News Scraper for Adayroi.jp
+# News Scraper for hungba.net
 
 A Python-based news scraping and processing pipeline that fetches articles from some news resource in the internet, groups them, translates content, and deploys to a Next.js website.
 
@@ -14,7 +14,7 @@ A Python-based news scraping and processing pipeline that fetches articles from 
 ## Project Structure
 
 ```
-news.adayroi.jp-scraper/
+news.hungba.net-scraper/
 ├── run.py                      # Main launcher script (run this!)
 ├── src/
 │   ├── main.py                 # Main application logic
@@ -56,7 +56,7 @@ news.adayroi.jp-scraper/
 
    ```bash
    git clone <repository-url>
-   cd news.adayroi.jp-scraper
+   cd news.hungba.net-scraper
    ```
 
 2. **Create virtual environment**:

@@ -20,9 +20,9 @@ if errorlevel 1 (
 )
 
 REM Activate virtual environment if it exists
-if exist "E:\Github\news.adayroi.jp-scraper\.venv\Scripts\activate.bat" (
+if exist "E:\Github\news.hungba.net-scraper\.venv\Scripts\activate.bat" (
     echo Activating virtual environment...
-    call E:\Github\news.adayroi.jp-scraper\.venv\Scripts\activate.bat
+    call E:\Github\news.hungba.net-scraper\.venv\Scripts\activate.bat
 ) else (
     echo Warning: Virtual environment not found at .venv\Scripts\activate.bat
     echo Running with system Python...

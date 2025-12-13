@@ -61,7 +61,7 @@ class Config:
             "PROCESSED_IDS_FILE", "processed_ids.txt")
         self.npm_command = os.getenv("NPM_COMMAND", "npm")
 
-        self.nextjs_url = os.getenv("NEXTJS_URL", "https://news.adayroi.jp")
+        self.nextjs_url = os.getenv("NEXTJS_URL", "https://news.hungba.net")
 
         self.dir_step_1 = os.getenv("DIR_STEP_1", "data/1.raw_html")
         self.dir_step_2 = os.getenv("DIR_STEP_2", "data/2.groups")
