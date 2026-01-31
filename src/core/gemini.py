@@ -9,13 +9,103 @@ import os
 import json
 import time
 import datetime
-from typing import Optional
+from typing import Optional, List
 from google import genai
 
 
 logger = logging.getLogger(__name__)
 
 GEMINI_MODEL = 'gemini-2.5-flash-lite'
+
+
+class APIKeyRotator:
+    """Manages multiple API keys and rotates between them for rate limit handling."""
+
+    def __init__(self):
+        """Initialize with all available API keys from environment variables."""
+        self.api_keys: List[str] = []
+        self.clients: List[genai.Client] = []
+        self.current_key_index = 0
+        self.key_usage_count = {}
+        self.key_error_count = {}
+        self._load_api_keys()
+
+    def _load_api_keys(self):
+        """Load all API keys from environment variables (GOOGLE_API_KEY_1, GOOGLE_API_KEY_2, etc.)."""
+        # First try to load numbered keys
+        index = 1
+        while True:
+            key = os.getenv(f"GOOGLE_API_KEY_{index}")
+            if not key:
+                break
+            self.api_keys.append(key)
+            self.key_usage_count[index - 1] = 0
+            self.key_error_count[index - 1] = 0
+            index += 1
+
+        # Fallback to single GOOGLE_API_KEY if no numbered keys found
+        if not self.api_keys:
+            key = os.getenv("GOOGLE_API_KEY")
+            if key:
+                self.api_keys.append(key)
+                self.key_usage_count[0] = 0
+                self.key_error_count[0] = 0
+
+        # Initialize clients for all keys
+        for api_key in self.api_keys:
+            try:
+                client = genai.Client(api_key=api_key)
+                self.clients.append(client)
+            except Exception as e:
+                logger.error(
+                    f"Failed to initialize client for key index {len(self.clients)}: {e}")
+
+        if self.api_keys:
+            logger.info(
+                f"APIKeyRotator initialized with {len(self.api_keys)} API key(s)")
+        else:
+            logger.warning("No API keys found in environment variables")
+
+    def get_current_client(self) -> Optional[genai.Client]:
+        """Get the current active client."""
+        if not self.clients:
+            return None
+        return self.clients[self.current_key_index]
+
+    def rotate_key(self) -> Optional[genai.Client]:
+        """Rotate to the next API key and return its client."""
+        if not self.clients:
+            return None
+
+        previous_index = self.current_key_index
+        self.current_key_index = (
+            self.current_key_index + 1) % len(self.clients)
+
+        logger.warning(f"Rotating API key: {previous_index} → {self.current_key_index} "
+                       f"(using key {self.current_key_index + 1}/{len(self.clients)})")
+
+        return self.clients[self.current_key_index]
+
+    def record_usage(self, success: bool = True):
+        """Record API usage for the current key."""
+        self.key_usage_count[self.current_key_index] += 1
+        if not success:
+            self.key_error_count[self.current_key_index] += 1
+
+    def get_stats(self) -> str:
+        """Get usage statistics for all keys."""
+        stats = []
+        for idx in range(len(self.api_keys)):
+            usage = self.key_usage_count.get(idx, 0)
+            errors = self.key_error_count.get(idx, 0)
+            status = "●" if idx == self.current_key_index else "○"
+            stats.append(
+                f"{status} Key {idx + 1}: {usage} requests, {errors} errors")
+        return " | ".join(stats)
+
+
+# Initialize the API key rotator
+key_rotator = APIKeyRotator()
 
 
 PROMPT_GROUP_ARTICLES = r"""Optimize this JSON file by grouping related news articles based on their content, creating concise and descriptive summary titles for each group, and preserving ungrouped articles with their original titles. Ensure the titles are written in Japanese and reflect the core themes of the articles.
@@ -145,10 +235,6 @@ PROMPT_TRANSLATE_ARTICLES = r"""Translate the following Japanese news article to
 """
 
 
-# Initialize the client if API is available
-client = genai.Client(api_key=os.getenv("GOOGLE_API_KEY"))
-
-
 def group_article(file_path: str) -> Optional[str]:
     """
     Group related articles using Gemini AI.
@@ -159,6 +245,8 @@ def group_article(file_path: str) -> Optional[str]:
     Returns:
         JSON string of grouped articles or None if failed
     """
+    client = key_rotator.get_current_client()
+
     if not client:
         logger.warning("Gemini AI not available. Using fallback grouping...")
         return _fallback_group_articles(file_path)
@@ -178,23 +266,48 @@ def group_article(file_path: str) -> Optional[str]:
         json.dumps(json_content, ensure_ascii=False)
 
     logger.info(f"Sending {len(json_content)} articles to Gemini for grouping")
+    logger.info(
+        f"Using API key {key_rotator.current_key_index + 1}/{len(key_rotator.api_keys)}")
 
     # Configurable via GEMINI_MAX_RETRIES env var (default: 10)
     max_retries = config.gemini_max_retries
     retry_delay = 5  # Start with 5 seconds
     response = None
+    keys_tried = set()
 
     for attempt in range(max_retries):
         try:
+            client = key_rotator.get_current_client()
+            if not client:
+                logger.error("No API client available")
+                return None
+
             response = client.models.generate_content(
                 model=GEMINI_MODEL,
                 contents=[prompt],
             )
             logger.info(
                 f"Received response from Gemini API (attempt {attempt+1})")
+            key_rotator.record_usage(success=True)
             break
         except Exception as e:
-            if attempt < max_retries - 1:
+            error_str = str(e).lower()
+            key_rotator.record_usage(success=False)
+
+            # Check if it's a rate limit error
+            is_rate_limit = any(term in error_str for term in
+                                ['rate', 'quota', 'limit', '429', '503', '500'])
+
+            if is_rate_limit and attempt < max_retries - 1:
+                logger.warning(
+                    f"Rate limit detected (attempt {attempt+1}/{max_retries})")
+                logger.info(f"Current key stats: {key_rotator.get_stats()}")
+                key_rotator.rotate_key()
+                logger.info(
+                    f"Retrying with next API key in {retry_delay} seconds...")
+                time.sleep(retry_delay)
+                retry_delay = 5  # Reset delay for new key
+            elif attempt < max_retries - 1:
                 logger.error(
                     f"Error generating content (attempt {attempt+1}/{max_retries}): {e}")
                 logger.info(f"Retrying in {retry_delay} seconds...")
@@ -203,6 +316,7 @@ def group_article(file_path: str) -> Optional[str]:
             else:
                 logger.error(f"Failed after {max_retries} attempts: {e}")
                 logger.error(f"Last exception type: {type(e).__name__}")
+                logger.info(f"Final key stats: {key_rotator.get_stats()}")
                 return None
 
     if not response or not hasattr(response, "text") or not response.text:
@@ -254,6 +368,8 @@ def translate_article(file_path):
     """
     filename = os.path.basename(file_path)
     logger.info(f"Processing translation for: {filename}")
+    logger.info(
+        f"Using API key {key_rotator.current_key_index + 1}/{len(key_rotator.api_keys)}")
 
     with open(file_path, 'r', encoding='utf-8') as file:
         markdown_content = file.read()
@@ -277,14 +393,36 @@ def translate_article(file_path):
     logger.info(f"Sending translation request to Gemini API for {filename}")
     for attempt in range(max_retries):
         try:
+            client = key_rotator.get_current_client()
+            if not client:
+                logger.error("No API client available")
+                return {"error": "No API client available"}
+
             response = client.models.generate_content(
                 model=GEMINI_MODEL,
                 contents=[prompt],
             )
             logger.info(f"✓ Received response from Gemini API for {filename}")
+            key_rotator.record_usage(success=True)
             break
         except Exception as e:
-            if attempt < max_retries - 1:
+            error_str = str(e).lower()
+            key_rotator.record_usage(success=False)
+
+            # Check if it's a rate limit error
+            is_rate_limit = any(term in error_str for term in
+                                ['rate', 'quota', 'limit', '429', '503', '500'])
+
+            if is_rate_limit and attempt < max_retries - 1:
+                logger.warning(
+                    f"✗ Rate limit detected for {filename} (attempt {attempt+1}/{max_retries})")
+                logger.info(f"Current key stats: {key_rotator.get_stats()}")
+                key_rotator.rotate_key()
+                logger.info(
+                    f"Retrying with next API key in {retry_delay} seconds...")
+                time.sleep(retry_delay)
+                retry_delay = 5  # Reset delay for new key
+            elif attempt < max_retries - 1:
                 logger.error(
                     f"✗ Error generating content (attempt {attempt+1}/{max_retries}) for {filename}: {e}")
                 logger.info(f"Retrying in {retry_delay} seconds...")
@@ -293,6 +431,7 @@ def translate_article(file_path):
             else:
                 logger.error(
                     f"✗ Failed after {max_retries} attempts for {filename}: {e}")
+                logger.info(f"Final key stats: {key_rotator.get_stats()}")
                 return {"error": str(e)}
 
     if not response or not hasattr(response, "text") or not response.text:
