@@ -13,7 +13,6 @@ Usage (from project root after activating .venv):
 Or simply run:
     run_scraper.bat                  # Windows batch file (activates .venv automatically)
 """
-from main import main
 import sys
 from pathlib import Path
 from dotenv import load_dotenv
@@ -27,8 +26,6 @@ env_path = Path(__file__).parent / ".env"
 if env_path.exists():
     load_dotenv(env_path)
 
-# Now import local modules
-
-
+from main import main
 if __name__ == "__main__":
     main()
