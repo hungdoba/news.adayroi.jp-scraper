@@ -3,6 +3,7 @@ AI processing module using Google Gemini API.
 This module handles article grouping and translation using Gemini AI.
 """
 from utils.file import sanitize_yaml_value, sanitize_slug
+from config import config
 import logging
 import os
 import json
@@ -14,7 +15,8 @@ from google import genai
 
 logger = logging.getLogger(__name__)
 
-GEMINI_MODEL = 'gemini-2.5-flash'
+GEMINI_MODEL = 'gemini-2.5-flash-lite'
+
 
 PROMPT_GROUP_ARTICLES = r"""Optimize this JSON file by grouping related news articles based on their content, creating concise and descriptive summary titles for each group, and preserving ungrouped articles with their original titles. Ensure the titles are written in Japanese and reflect the core themes of the articles.
 
@@ -174,8 +176,12 @@ def group_article(file_path: str) -> Optional[str]:
 
     prompt = PROMPT_GROUP_ARTICLES + \
         json.dumps(json_content, ensure_ascii=False)
-    max_retries = 3
-    retry_delay = 5
+
+    logger.info(f"Sending {len(json_content)} articles to Gemini for grouping")
+
+    # Configurable via GEMINI_MAX_RETRIES env var (default: 10)
+    max_retries = config.gemini_max_retries
+    retry_delay = 5  # Start with 5 seconds
     response = None
 
     for attempt in range(max_retries):
@@ -184,6 +190,8 @@ def group_article(file_path: str) -> Optional[str]:
                 model=GEMINI_MODEL,
                 contents=[prompt],
             )
+            logger.info(
+                f"Received response from Gemini API (attempt {attempt+1})")
             break
         except Exception as e:
             if attempt < max_retries - 1:
@@ -194,10 +202,17 @@ def group_article(file_path: str) -> Optional[str]:
                 retry_delay *= 2
             else:
                 logger.error(f"Failed after {max_retries} attempts: {e}")
+                logger.error(f"Last exception type: {type(e).__name__}")
                 return None
 
     if not response or not hasattr(response, "text") or not response.text:
         logger.error("No response from API")
+        if response:
+            logger.error(
+                f"Response object exists but has no text. Response type: {type(response)}")
+            logger.error(f"Response attributes: {dir(response)}")
+        else:
+            logger.error("Response object is None")
         return None
 
     response_text = response.text.strip()
@@ -220,8 +235,9 @@ def group_article(file_path: str) -> Optional[str]:
 
     try:
         return json.dumps(json.loads(json_str), ensure_ascii=False, indent=2)
-    except json.JSONDecodeError:
-        logger.error("Failed to parse JSON response")
+    except json.JSONDecodeError as e:
+        logger.error(f"Failed to parse JSON response: {e}")
+        logger.error(f"Extracted JSON string: {json_str}")
         logger.error(f"Raw response: {response_text}")
         return None
 
@@ -253,8 +269,9 @@ def translate_article(file_path):
     logger.debug(f"Content length: {content_length} characters")
 
     prompt = PROMPT_TRANSLATE_ARTICLES + markdown_content
-    max_retries = 3
-    retry_delay = 5
+    # Configurable via GEMINI_MAX_RETRIES env var (default: 10)
+    max_retries = config.gemini_max_retries
+    retry_delay = 5  # Start with 5 seconds
     response = None
 
     logger.info(f"Sending translation request to Gemini API for {filename}")

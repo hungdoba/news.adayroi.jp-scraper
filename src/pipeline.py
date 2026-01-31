@@ -142,7 +142,7 @@ class NewsPipeline:
         # Fetch content for new articles
         raw_html_data = []
         for article in new_articles:
-            log_id(self.config.processed_ids_file, article.raw_id)
+            # Don't log ID yet - wait until grouping succeeds
             title_content = fetch_and_save_article(
                 article.url, article.raw_id, self.config.dir_step_1
             )
@@ -193,6 +193,17 @@ class NewsPipeline:
         update_group_ids_to_raw_id(file_path, output_file)
 
         logger.info(f"Saved article groups to {output_file}")
+
+        # Now that grouping succeeded, log the article IDs as processed
+        try:
+            with open(file_path, 'r', encoding='utf-8') as f:
+                articles = json.load(f)
+            for article in articles:
+                log_id(self.config.processed_ids_file, article['raw_id'])
+            logger.info(f"Logged {len(articles)} article IDs as processed")
+        except Exception as e:
+            logger.warning(f"Failed to log processed IDs: {e}")
+
         return output_file
 
     def step_3_merge_articles(self, group_article_filename: str, output_folder: str) -> None:

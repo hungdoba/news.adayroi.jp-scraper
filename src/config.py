@@ -18,6 +18,7 @@ class Config:
     feed_url: str = ""
     news_feed_selector: str = ""
     google_api_key: str = ""
+    gemini_max_retries: int = 10  # Maximum retry attempts for Gemini API calls
 
     # Directory Paths
     data_dir: str = ""
@@ -49,6 +50,7 @@ class Config:
         self.news_feed_selector = os.getenv(
             "NEWS_FEED_SELECTOR", ".newsFeed_list")
         self.google_api_key = os.getenv("GOOGLE_API_KEY", "")
+        self.gemini_max_retries = int(os.getenv("GEMINI_MAX_RETRIES", "10"))
 
         self.data_dir = os.getenv("DATA_DIR", "data")
         self.yahoo_dir = os.getenv("YAHOO_DIR", "yahoo")
