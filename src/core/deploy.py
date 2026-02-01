@@ -31,8 +31,8 @@ def build_next_app():
                 f"NextJS directory does not exist: {nextjs_dir}"
             )
 
-        command = r"C:\Program Files\nodejs\npm.cmd"
-        args = ["run", "build"]
+        command = r"C:\Users\hungba\AppData\Roaming\npm\pnpm.cmd"
+        args = ["build"]
 
         _run_command_and_stream_output(command, args, nextjs_dir)
         return True

@@ -311,13 +311,13 @@ class NewsPipeline:
 
     def step_9_cleanup_nextjs(self) -> None:
         """Clean up old markdown files in Next.js project."""
-        logger.info("Step 10: Cleaning up Next.js")
+        logger.info("Step 9: Cleaning up Next.js")
         cleanup_old_markdown_files(self.config.nextjs_dir)
         logger.info("Next.js cleanup completed")
 
     def step_10_deploy(self) -> None:
         """Deploy the Next.js application."""
-        logger.info("Step 9: Starting deployment")
+        logger.info("Step 10: Starting deployment")
 
         build_success = build_next_app()
         if not build_success:
